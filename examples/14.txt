@@ -1,0 +1,3 @@
+teeeeeeeeype Day = 
+	| Monday 
+	& Thuesday;
