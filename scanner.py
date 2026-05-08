@@ -44,7 +44,12 @@ class Scanner:
     
     def is_whitespace(self, c):
         return c in ' \t\r'
-    
+
+    # Символы, которые "закрывают" текущую лексему: пробелы и
+    # любой структурный токен языка. Всё, что не в этом списке,
+    # считается частью текущей последовательности.
+    _STOP_CHARS = ' \t\r\n=|;'
+
     def add_token(self, token_type, value, line, start, end):
         if token_type != TokenType.WHITESPACE:
             self.tokens.append(Token(token_type, value, line, start, end))
@@ -83,6 +88,24 @@ class Scanner:
                 ):
                     j += 1
 
+                # Если сразу после слова идёт недопустимый символ
+                # (не пробел и не структурный разделитель),
+                # вся "слипшаяся" последовательность считается
+                # одной лексической ошибкой.
+                if j < n and text[j] not in self._STOP_CHARS:
+                    while j < n and text[j] not in self._STOP_CHARS:
+                        j += 1
+                    value = text[i:j]
+                    self.add_token(
+                        TokenType.ERROR,
+                        value,
+                        start_line,
+                        start_pos,
+                        start_pos + len(value) - 1
+                    )
+                    i = j
+                    continue
+
                 value = text[i:j]
 
                 # корректный type
@@ -114,6 +137,23 @@ class Scanner:
                 j = i
                 while j < n and (self.is_letter(text[j]) or self.is_digit(text[j]) or text[j] == '_'):
                     j += 1
+
+                # Идентификатор, "слипшийся" с недопустимым символом,
+                # — целиком одна лексическая ошибка.
+                if j < n and text[j] not in self._STOP_CHARS:
+                    while j < n and text[j] not in self._STOP_CHARS:
+                        j += 1
+                    value = text[i:j]
+                    self.add_token(
+                        TokenType.ERROR,
+                        value,
+                        start_line,
+                        start_pos,
+                        start_pos + len(value) - 1
+                    )
+                    i = j
+                    continue
+
                 value = text[i:j]
                 self.add_token(TokenType.IDENTIFIER, value, start_line, start_pos, start_pos + len(value) - 1)
                 i = j

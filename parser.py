@@ -76,40 +76,15 @@ class Parser:
     # =====================================================
 
     def current_token(self) -> Optional[Token]:
+        """
+        Возвращает текущий токен без побочных эффектов.
+        ERROR-токены не пропускаются здесь: их обрабатывает
+        consume() как "джокер" (лексер уже сообщил об ошибке,
+        парсер не должен дублировать диагностику).
+        """
 
-        while self.position < len(self.tokens):
-
-            token = self.tokens[self.position]
-
-            # =====================================
-            # Нейтрализация ошибок (метод Айронса)
-            # =====================================
-
-            if token.type == TokenType.ERROR:
-
-                # пропускаем ошибочный токен
-                self.position += 1
-
-                # пропускаем остаток ошибочной конструкции
-                while self.position < len(self.tokens):
-
-                    next_token = self.tokens[self.position]
-
-                    # точка восстановления
-                    if (
-                        next_token.type == TokenType.PIPE
-                        or (
-                            next_token.type == TokenType.SEPARATOR
-                            and next_token.value == ";"
-                        )
-                    ):
-                        break
-
-                    self.position += 1
-
-                continue
-
-            return token
+        if self.position < len(self.tokens):
+            return self.tokens[self.position]
 
         return None
 
@@ -147,9 +122,37 @@ class Parser:
     # CONSUME
     # =====================================================
 
+    # позиции, где ERROR логично считать "сломанным словом"
+    # (идентификатор / ключевое слово). В структурных позициях
+    # (|, =, ;) ERROR просто проскакиваем — лексер о нём
+    # уже отчитался и плодить вторую ошибку не нужно.
+    _WORD_LIKE_TYPES = {TokenType.KEYWORD, TokenType.IDENTIFIER}
+
     def consume(self, expected_type, expected_value=None):
 
+        # ==========================================
+        # Пропуск ERROR-токенов в структурных позициях.
+        # Для PIPE / OPERATOR / SEPARATOR посторонний
+        # ошибочный токен не должен сдвигать разбор.
+        # ==========================================
+
+        if expected_type not in self._WORD_LIKE_TYPES:
+            while (self.position < len(self.tokens)
+                   and self.tokens[self.position].type == TokenType.ERROR):
+                self.position += 1
+
         token = self.current_token()
+
+        # ==========================================
+        # ERROR в "словесной" позиции: трактуем как
+        # заглушку для ожидаемого KEYWORD/IDENTIFIER.
+        # Это предотвращает каскадную диагностику
+        # после уже сообщённой лексической ошибки.
+        # ==========================================
+
+        if token is not None and token.type == TokenType.ERROR:
+            self.position += 1
+            return token
 
         # ==========================================
         # EOF
