@@ -169,11 +169,14 @@ class Examples_Correct_Tests(unittest.TestCase):
         self.assertEqual(total_errors(code), 0)
 
     def test_04_uppercase_keyword(self):
-        # 'Type' -> идентификатор, парсер не примет его как KEYWORD
+        # 'Type' -> идентификатор; парсер сообщает один раз
+        # ("Ожидался KEYWORD"), затем спокойно разбирает имя
+        # типа, '=', case-list и ';'.
         code = "Type Day =\n    | Monday;"
-        lex, syn, _ = analyze(code)
+        lex, syn, ast = analyze(code)
         self.assertEqual(len(lex), 0)
-        self.assertGreater(len(syn), 0)
+        self.assertEqual(len(syn), 1)
+        self.assertEqual(ast.cases, ["Monday"])
 
     def test_05_drop_equals(self):
         code = "type Day\n    | Monday\n    | Tuesday;"

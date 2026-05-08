@@ -140,6 +140,27 @@ class InvalidEnumTests(unittest.TestCase):
         _, syn, _ = analyze(code)
         self.assertEqual(len(syn), 0, "пустой ввод — нет токенов, парсер молчит")
 
+    def test_15a_typo_in_keyword_and_missing_eq(self):
+        # Регрессия: 'jdjtype Day | … | Sunday;' — нет ни 'type',
+        # ни '='. Должно быть ровно 2 синтаксические ошибки
+        # (Ожидался KEYWORD + Ожидался OPERATOR), без каскада.
+        code = (
+            "jdjtype Day \n"
+            " | Monday\n"
+            " | Tuesday\n"
+            " | Wednesday\n"
+            " | Thursday\n"
+            " | Friday\n"
+            " | Saturday\n"
+            " | Sunday;"
+        )
+        lex, syn, ast = analyze(code)
+        self.assertEqual(len(lex), 0)
+        self.assertEqual(len(syn), 2)
+        # Сами кейсы парсер должен распознать (Monday будет
+        # пропущен как часть recovery после '=').
+        self.assertIn("Sunday", ast.cases)
+
     def test_15_garbage_glued_to_identifier_is_one_error(self):
         # Регрессия: 'S%%%%unday' — это «обломанный» идентификатор,
         # сканер должен слепить его в один ERROR, парсер не должен

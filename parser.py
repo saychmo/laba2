@@ -259,8 +259,6 @@ class Parser:
 
     def parse_enum_declaration(self):
 
-        recovery_after_type_error = False
-
         # =====================================================
         # type
         # =====================================================
@@ -268,12 +266,11 @@ class Parser:
         keyword = self.consume(TokenType.KEYWORD, "type")
 
         # =====================================================
-        # Ошибка в type
+        # Ошибка в type — догоняем до ближайшего IDENTIFIER,
+        # чтобы продолжить разбор имени типа без каскада.
         # =====================================================
 
         if keyword is None:
-
-            recovery_after_type_error = True
 
             while self.current_token() is not None:
 
@@ -282,7 +279,6 @@ class Parser:
                 if token is None:
                     break
 
-                # нашли имя типа
                 if token.type == TokenType.IDENTIFIER:
                     break
 
@@ -332,17 +328,17 @@ class Parser:
         # =====================================================
         # CaseList
         # =====================================================
+        # Разбираем case-list всегда: если выше уже были ошибки,
+        # recovery подвёл нас либо к ближайшему '|', либо к ';'.
+        # В любом случае дальнейший разбор не должен плодить
+        # дополнительные сообщения сверх уже выданных.
 
         cases = []
 
-        # НЕ разбираем case list,
-        # если keyword type был сломан
-        if not recovery_after_type_error:
+        parsed_cases = self.parse_case_list()
 
-            parsed_cases = self.parse_case_list()
-
-            if parsed_cases is not None:
-                cases = parsed_cases
+        if parsed_cases is not None:
+            cases = parsed_cases
 
         # =====================================================
         # ;
@@ -387,6 +383,14 @@ class Parser:
             # Конец списка
             if token.type == TokenType.SEPARATOR:
                 break
+
+            # Случайный ERROR-токен между кейсами (или
+            # на месте первого '|', если выше уже была
+            # ошибка). Лексер уже сообщил о нём — просто
+            # пропускаем, не плодя синтаксических диагностик.
+            if token.type == TokenType.ERROR:
+                self.position += 1
+                continue
 
             case = self.parse_case()
 
